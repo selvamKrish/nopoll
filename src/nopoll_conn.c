@@ -3156,8 +3156,15 @@ void nopoll_conn_mask_content (noPollCtx * ctx, char * payload, int payload_size
 	} /* end while */
 
 	return;
-} 
+}
 
+noPollMsg * __nopoll_msg_join(noPollMsg *fragMsg, noPollMsg *msg)
+{
+	noPollMsg *appendMsg = nopoll_msg_join(fragMsg,msg);
+	nopoll_msg_unref (fragMsg);
+	nopoll_msg_unref (msg);
+	return appendMsg;
+}
 
 /** 
  * @brief Allows to get the next message available on the provided
@@ -3619,7 +3626,6 @@ read_payload:
 		return NULL;		
 	} /* end if */
 
-
 	/* record we've got content pending to be read */
 	msg->remain_bytes = msg->payload_size - bytes;	
 	if (msg->remain_bytes > 0) {
@@ -3642,7 +3648,7 @@ read_payload:
 		/* flag that this message doesn't have FIN = 0 because
 		 * we wasn't able to read it entirely */
 		/*set msg->has_fin to 0, as it read only fewer bytes, there will be some remaining fragmented bytes to read*/
-/* msg->has_fin = 0; */
+		 msg->has_fin = 0;
 	} /* end if */
 
 nopoll_log(conn->ctx, NOPOLL_LEVEL_DEBUG, "bytes %d, msg->payload_size %d, msg->remain_bytes %d, msg->has_fin %d, msg->op_code %d\n",bytes,msg->payload_size,msg->remain_bytes,msg->has_fin,msg->op_code);
@@ -3670,6 +3676,48 @@ nopoll_log(conn->ctx, NOPOLL_LEVEL_DEBUG, "bytes %d, msg->payload_size %d, msg->
 		/* flag what was unmasked */
 		msg->unmask_desp += msg->payload_size;
 	} /* end if */
+
+	if(msg->has_fin == 0)
+		{
+			nopoll_log(conn->ctx, NOPOLL_LEVEL_INFO, "Received Fragment - FIN: %d, Opcode: %d, payload size: %d, Remaining bytes: %d",msg->has_fin,msg->op_code,nopoll_msg_get_payload_size(msg),msg->remain_bytes);
+			conn->append_previous_fragment = 1;
+			if(conn->append_previous_msg == NULL)
+			{
+				conn->append_previous_msg = msg;
+				nopoll_log(conn->ctx, NOPOLL_LEVEL_INFO, "Received fragment, joined the message, waiting for last fragment");
+				return NULL;
+			}
+			else
+			{
+				if(nopoll_msg_get_payload_size(msg) == msg->remain_bytes)
+				{
+					nopoll_log(conn->ctx, NOPOLL_LEVEL_DEBUG,"nopoll_msg_ref_count(conn->append_previous_msg) %d, nopoll_msg_ref_count(msg) %d\n",nopoll_msg_ref_count(conn->append_previous_msg),nopoll_msg_ref_count(msg));
+					msg = __nopoll_msg_join(conn->append_previous_msg,msg);
+					nopoll_log(conn->ctx, NOPOLL_LEVEL_INFO,"Received all the pending bytes, hence which means the complete message is received");
+					conn->append_previous_msg = NULL;
+					conn->append_previous_fragment = 0;
+					nopoll_log(conn->ctx, NOPOLL_LEVEL_INFO,"Received last fragment payload size %d, joined the old fragment messages",msg->payload_size);
+				}
+				else
+				{
+					nopoll_log(conn->ctx, NOPOLL_LEVEL_DEBUG,"nopoll_msg_ref_count(conn->append_previous_msg) %d, nopoll_msg_ref_count(msg) %d\n",nopoll_msg_ref_count(conn->append_previous_msg),nopoll_msg_ref_count(msg));
+					conn->append_previous_msg = __nopoll_msg_join(conn->append_previous_msg,msg);
+					nopoll_log(conn->ctx, NOPOLL_LEVEL_INFO, "Received fragment, joined the message, waiting for last fragment");
+					return NULL;
+				}
+
+			}
+		}
+		else if(msg->has_fin == 1 && conn->append_previous_fragment && msg->op_code == NOPOLL_CONTINUATION_FRAME)
+		{
+			nopoll_log(conn->ctx, NOPOLL_LEVEL_INFO, "Received Fragment - FIN: %d, Opcode: %d, payload size: %d, Remaining bytes: %d",msg->has_fin,msg->op_code,nopoll_msg_get_payload_size(msg),msg->remain_bytes);
+			nopoll_log(conn->ctx, NOPOLL_LEVEL_DEBUG,"nopoll_msg_ref_count(conn->append_previous_msg) %d, nopoll_msg_ref_count(msg) %d\n",nopoll_msg_ref_count(conn->append_previous_msg),nopoll_msg_ref_count(msg));
+			msg = __nopoll_msg_join(conn->append_previous_msg,msg);
+			conn->append_previous_msg = NULL;
+			conn->append_previous_fragment = 0;
+			nopoll_log(conn->ctx, NOPOLL_LEVEL_INFO,"Received last fragment payload size %d, joined the old fragment messages",msg->payload_size);
+		}
+
 
 	/* check here close frame with reason */
 	if (msg->op_code == NOPOLL_CLOSE_FRAME) {
