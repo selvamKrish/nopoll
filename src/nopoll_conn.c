@@ -3578,22 +3578,22 @@ noPollMsg   * nopoll_conn_get_msg (noPollConn * conn)
 		/* check for empty PING frames (RFC6455 5.5.2. Ping
 		   frame may include 'Application data'. Fixes
 		   https://github.com/ASPLes/nopoll/issues/31 */
-			if (msg->op_code == NOPOLL_PING_FRAME) {
+		if (msg->op_code == NOPOLL_PING_FRAME) {
 
-				nopoll_log (conn->ctx, NOPOLL_LEVEL_DEBUG, "PING received over connection id=%d, replying PONG", conn->id);
-				/* call to send pong */
-				nopoll_conn_send_pong (conn, nopoll_msg_get_payload_size (msg), (noPollPtr)nopoll_msg_get_payload (msg));
-				nopoll_msg_unref (msg);
-
-				/* reporting no message (but no error) */
-				return NULL;
-			} /* end if */
-
-			nopoll_log (conn->ctx, NOPOLL_LEVEL_WARNING, "Found incoming frame with payload size 0, shutting down id=%d the connection", conn->id);
+			nopoll_log (conn->ctx, NOPOLL_LEVEL_DEBUG, "PING received over connection id=%d, replying PONG", conn->id);
+			/* call to send pong */
+			nopoll_conn_send_pong (conn, nopoll_msg_get_payload_size (msg), (noPollPtr)nopoll_msg_get_payload (msg));
 			nopoll_msg_unref (msg);
-			nopoll_conn_shutdown (conn);
-			return NULL; 
-		}	
+
+			/* reporting no message (but no error) */
+			return NULL;
+		} /* end if */
+
+		nopoll_log (conn->ctx, NOPOLL_LEVEL_WARNING, "Found incoming frame with payload size 0, shutting down id=%d the connection", conn->id);
+		nopoll_msg_unref (msg);
+		nopoll_conn_shutdown (conn);
+		return NULL; 
+}
 	} /* end if */
 
 	/* check here for the limit of message we are willing to accept */
@@ -3642,9 +3642,10 @@ read_payload:
 		/* flag that this message doesn't have FIN = 0 because
 		 * we wasn't able to read it entirely */
 		/*set msg->has_fin to 0, as it read only fewer bytes, there will be some remaining fragmented bytes to read*/
-		 msg->has_fin = 0; 
+/* msg->has_fin = 0; */
 	} /* end if */
 
+nopoll_log(conn->ctx, NOPOLL_LEVEL_DEBUG, "bytes %d, msg->payload_size %d, msg->remain_bytes %d, msg->has_fin %d, msg->op_code %d\n",bytes,msg->payload_size,msg->remain_bytes,msg->has_fin,msg->op_code);
 	/* flag the message was being a fragment according to previous flag */
 	msg->is_fragment = msg->is_fragment || conn->previous_was_fragment || msg->has_fin == 0;
 
