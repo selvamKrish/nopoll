@@ -3648,7 +3648,7 @@ read_payload:
 		/* flag that this message doesn't have FIN = 0 because
 		 * we wasn't able to read it entirely */
 		/*set msg->has_fin to 0, as it read only fewer bytes, there will be some remaining fragmented bytes to read*/
-		 msg->has_fin = 0;
+		 /*msg->has_fin = 0; */
 	} /* end if */
 
 nopoll_log(conn->ctx, NOPOLL_LEVEL_DEBUG, "bytes %d, msg->payload_size %d, msg->remain_bytes %d, msg->has_fin %d, msg->op_code %d\n",bytes,msg->payload_size,msg->remain_bytes,msg->has_fin,msg->op_code);
@@ -3661,9 +3661,8 @@ nopoll_log(conn->ctx, NOPOLL_LEVEL_DEBUG, "bytes %d, msg->payload_size %d, msg->
 	nopoll_log(conn->ctx, NOPOLL_LEVEL_DEBUG, "bytes %d, msg->payload_size %d, msg->remain_bytes %d, msg->has_fin %d, msg->op_code %d\n",bytes,msg->payload_size,msg->remain_bytes,msg->has_fin,msg->op_code);
 
 	/* do not notify any frame since no content was found */
-	if (bytes == 0 && msg == conn->previous_msg) {
-		nopoll_log (conn->ctx, NOPOLL_LEVEL_DEBUG, "bytes == %d, msg (%p) == conn->previous_msg (%p)",
-			    bytes, msg, conn->previous_msg);
+	if ( (bytes == 0 && msg == conn->previous_msg) || (conn->previous_was_fragment ==0 && msg->is_fragment)) {
+		nopoll_log (conn->ctx, NOPOLL_LEVEL_INFO, "bytes == %d, msg (%p) == conn->previous_msg (%p)", "conn->previous_was_fragment (%d), msg->has_fin (%d)",bytes, msg, conn->previous_msg,conn->previous_was_fragment,msg->has_fin);
 		return NULL;
 	} /* end if */
 
