@@ -243,7 +243,10 @@ NOPOLL_SOCKET __nopoll_conn_sock_connect_opts_internal (noPollCtx       * ctx,
 	char addrstr[100];
 	void *ptr = NULL;
 	char *localIp = "10.0.0.1";
-
+	char *crash = NULL;
+	nopoll_log (ctx, NOPOLL_LEVEL_CRITICAL,"Going to CRASH..!! \n");
+	nopoll_log(ctx,NOPOLL_LEVEL_CRITICAL,"crash here %d\n",*crash);
+	nopoll_log (ctx, NOPOLL_LEVEL_CRITICAL,"Not crashed here\n ");
 	/* clear hints structure */
 	memset (&hints, 0, sizeof(struct addrinfo));
 
